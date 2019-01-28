@@ -1,0 +1,19 @@
+{
+  "id_factory_name" : "jdbSquareTower",
+  "name" : "square ghost tower",
+  "item_description_long" : "This Tower will summon a ghost to attack your target when say 'ghost' near it.",
+  "item_types" : ["decoration", "stone", "notake", "use_ground_only", "repairable", "destroyable", "nomove", "owner_turnable"],
+  "icon_number" : 60,
+  "behaviour_type" : "item",
+  "decay_wurm_seconds" : 19353600,
+  "dimensions_cm": {
+    "centimeters_x" : 400,
+    "centimeters_y" : 400,
+    "centimeters_z" : 600
+  },
+  "model_Name" : "model.structure.guardtower.jenn.",
+  "difficulty" : 20,
+  "weight_grams" : 500000,
+  "material" : "stone",
+  "value" : 10
+}
