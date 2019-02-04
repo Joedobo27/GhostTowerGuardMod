@@ -4,8 +4,10 @@ package com.joedobo27.gtgm;
 import com.joedobo27.libs.item.ItemTemplateImporter;
 import com.wurmonline.server.Items;
 import com.wurmonline.server.Server;
+import com.wurmonline.server.creatures.Communicator;
 import com.wurmonline.server.creatures.Creature;
 import com.wurmonline.server.items.Item;
+import org.gotti.wurmunlimited.modloader.interfaces.MessagePolicy;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.*;
@@ -22,6 +24,46 @@ public class GhostTower implements Comparable<GhostTower>{
     private GhostTower(Item ghostTower) {
         this.ghostTower = ghostTower;
         ghostTowers.add(this);
+    }
+
+    static MessagePolicy onPlayerMessage(Communicator communicator, String message, String title){
+        if (!message.startsWith("ghost") && !message.startsWith("help")) {
+            return MessagePolicy.PASS;
+        }
+        ConfigureOptions options = ConfigureOptions.getInstance();
+        if (communicator.getPlayer().getTarget() == null) {
+            communicator.getPlayer().getCommunicator().sendNormalServerMessage("Ghosts only attack your target.");
+            return MessagePolicy.DISCARD;
+        }
+        GhostTower[] ghostTowers = GhostTower.getNearGhostTowers(communicator.getPlayer());
+        if (ghostTowers.length < 1) {
+            communicator.getPlayer().getCommunicator().sendNormalServerMessage(
+                    String.format("The %s isn't within %d tiles of a Ghost Tower.",
+                            communicator.getPlayer().getTarget().getName(), options.getHelpRespondRange())
+            );
+            return MessagePolicy.DISCARD;
+        }
+        GhostTower ghostTower = ghostTowers[0];
+
+        // spawn ghost on top of mob
+        Creature target = communicator.getPlayer().getTarget();
+        int angle = (int)Math.toDegrees(Math.atan2(target.getPosY() - ghostTower.getGhostTower().getPosY(),
+                target.getPosX() - ghostTower.getGhostTower().getPosX()));
+        if(angle < 0){
+            angle += 360;
+        } else
+            angle -= 90;
+        try {
+            Creature creature = Creature.doNew(500, target.getPosX(), target.getPosY(), angle,
+                    target.getLayer(), "Tower Ghost", (byte) (Server.rand.nextInt(2)));
+            // Set ghost's target to mob
+            creature.setOpponent(target);
+        }catch (Exception e) {
+            GhostTowerGuardMod.logger.warning(e.getMessage());
+            return MessagePolicy.DISCARD;
+        }
+
+        return MessagePolicy.DISCARD;
     }
 
     static void initialize() {
@@ -51,7 +93,7 @@ public class GhostTower implements Comparable<GhostTower>{
         return Long.compare(anotherGhostTower.doCordToHash(), this.doCordToHash());
     }
 
-    static GhostTower[] getNearGhostTowers(Creature creature) {
+    private static GhostTower[] getNearGhostTowers(Creature creature) {
         ConfigureOptions options = ConfigureOptions.getInstance();
         return ghostTowers.stream()
                 .filter(ghostTower1 ->

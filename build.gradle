@@ -67,6 +67,10 @@ distributions {
                 include("AdvancedCreationEntries/*.json")
                 into("${project.name}/")
             }
+            from('src/main/resources/') {
+                include("CreatureTemplates/*.json")
+                into("${project.name}/")
+            }
         }
     }
 }
