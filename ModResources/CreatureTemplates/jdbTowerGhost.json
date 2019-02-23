@@ -27,8 +27,8 @@
   "hit_sound_male" : "sound.combat.hit.spirit.male",
   "hit_sound_female" : "sound.combat.hit.spirit.female",
   "natural_armor" : 0.001,
-  "hand_damage" : 1000.0,
-  "kick_damage" : 1000.0,
+  "hand_damage" : 1000000.0,
+  "kick_damage" : 1000000.0,
   "bite_damage" : 0.0,
   "breath_damage" : 0.0,
   "speed" : 3.0,
@@ -39,5 +39,5 @@
   "alignment" : 99.9,
   "base_combat_rating" : 100,
   "damage_type" : "INTERNAL",
-  "is_no_corpse" : true,
+  "is_no_corpse" : true
 }

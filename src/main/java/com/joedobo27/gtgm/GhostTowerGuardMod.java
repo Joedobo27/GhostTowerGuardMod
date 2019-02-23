@@ -9,22 +9,23 @@ import com.wurmonline.server.creatures.ai.CreatureAI;
 import org.gotti.wurmunlimited.modloader.interfaces.*;
 
 import java.util.HashMap;
+import java.util.Properties;
 import java.util.logging.Logger;
 
 
-public class GhostTowerGuardMod implements WurmServerMod, ItemTemplatesCreatedListener, ServerStartedListener,
-        PlayerMessageListener {
+public class GhostTowerGuardMod implements WurmServerMod, Initable, ItemTemplatesCreatedListener, Configurable,
+        ServerStartedListener, PlayerMessageListener {
 
     static final Logger logger = Logger.getLogger(GhostTowerGuardMod.class.getName());
 
     @Override
-    public MessagePolicy onPlayerMessage(Communicator communicator, String message, String title) {
-        return  GhostTower.onPlayerMessage(communicator, message, title);
+    public void configure(Properties properties) {
+        ConfigureOptions.setOptions(properties);
     }
 
     @Override
-    public boolean onPlayerMessage(Communicator communicator, String s) {
-        return false;
+    public void init() {
+        GhostTower.injectAddTowerCode();
     }
 
     @Override
@@ -42,5 +43,17 @@ public class GhostTowerGuardMod implements WurmServerMod, ItemTemplatesCreatedLi
         creatureAIHashMap.put("jdbTowerGhost", new TowerGuardAI());
         CreatureTemplateImporter.importTemplates("mods\\GhostTowerGuardMod\\CreatureTemplates\\",
                 "mods\\jdbCommon\\", creatureAIHashMap);
+        GhostTower.initialize();
     }
+
+    @Override
+    public MessagePolicy onPlayerMessage(Communicator communicator, String message, String title) {
+        return  GhostTower.onPlayerMessage(communicator, message, title);
+    }
+
+    @Override
+    public boolean onPlayerMessage(Communicator communicator, String s) {
+        return false;
+    }
+
 }
