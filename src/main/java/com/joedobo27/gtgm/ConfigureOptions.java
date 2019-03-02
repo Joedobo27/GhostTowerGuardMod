@@ -7,7 +7,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.Properties;
 
-public class ConfigureOptions {
+class ConfigureOptions {
 
     /**
      * max tile distance a target can be for tower to attack.
@@ -30,27 +30,27 @@ public class ConfigureOptions {
         this.towerGhostIdName = towerGhostIdName;
     }
 
-    public int getHelpRespondRange() {
+    int getHelpRespondRange() {
         return helpRespondRange;
     }
 
-    public String getBlackTowerIdName() {
+    String getBlackTowerIdName() {
         return blackTowerIdName;
     }
 
-    public String getFortTowerIdName() {
+    String getFortTowerIdName() {
         return fortTowerIdName;
     }
 
-    public String getRoundTowerIdName() {
+    String getRoundTowerIdName() {
         return roundTowerIdName;
     }
 
-    public String getSquareTowerIdName() {
+    String getSquareTowerIdName() {
         return squareTowerIdName;
     }
 
-    public String getTowerGhostIdName() {
+    String getTowerGhostIdName() {
         return towerGhostIdName;
     }
 

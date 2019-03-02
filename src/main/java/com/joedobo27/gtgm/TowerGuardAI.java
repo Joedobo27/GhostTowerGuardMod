@@ -1,17 +1,18 @@
 package com.joedobo27.gtgm;
 
-import com.wurmonline.math.TilePos;
 import com.wurmonline.server.creatures.Creature;
 import com.wurmonline.server.creatures.Creatures;
 import com.wurmonline.server.creatures.ai.CreatureAI;
 import com.wurmonline.server.creatures.ai.CreatureAIData;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 public class TowerGuardAI extends CreatureAI {
 
-    public static final String id_factory_name = "jdbTowerGhost";
+    static final String id_factory_name = "jdbTowerGhost";
 
     @Override
-    protected boolean pollMovement(Creature creature, long l) {
+    protected boolean pollMovement(@NotNull Creature creature, long l) {
         // Delete guard if it has no target.
         if (creature.target == -10L) {
             creature.destroy();
@@ -31,12 +32,12 @@ public class TowerGuardAI extends CreatureAI {
     }
 
     @Override
-    protected boolean pollAttack(Creature creature, long l) {
+    protected boolean pollAttack(@Nullable Creature creature, long l) {
         return false;
     }
 
     @Override
-    protected boolean pollBreeding(Creature creature, long l) {
+    protected boolean pollBreeding(@Nullable Creature creature, long l) {
         return false;
     }
 
@@ -46,7 +47,7 @@ public class TowerGuardAI extends CreatureAI {
     }
 
     @Override
-    public void creatureCreated(Creature creature) {
+    public void creatureCreated(@NotNull Creature creature) {
         creature.getCreatureAIData().setCreature(creature);
     }
 

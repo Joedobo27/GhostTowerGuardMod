@@ -1,23 +1,25 @@
 package com.joedobo27.gtgm;
 
 
-import com.joedobo27.libs.bytecode.ByteCodeWild;
-import com.joedobo27.libs.item.ItemTemplateImporter;
 import com.wurmonline.server.Items;
+import com.wurmonline.server.Players;
 import com.wurmonline.server.Server;
 import com.wurmonline.server.creatures.Communicator;
 import com.wurmonline.server.creatures.Creature;
 import com.wurmonline.server.items.Item;
-import javassist.*;
-import javassist.bytecode.Descriptor;
-import org.gotti.wurmunlimited.modloader.classhooks.HookManager;
+import com.wurmonline.server.players.Player;
+import com.wurmonline.server.villages.Village;
+import com.wurmonline.server.villages.Villages;
 import org.gotti.wurmunlimited.modloader.interfaces.MessagePolicy;
 import org.gotti.wurmunlimited.modsupport.IdFactory;
 import org.gotti.wurmunlimited.modsupport.IdType;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
 import java.util.stream.Collectors;
+
+import static com.joedobo27.libs.item.ItemTemplateImporter.getItemTemplateBuilderNames;
 
 @SuppressWarnings("unused")
 public class GhostTower implements Comparable<GhostTower>{
@@ -34,27 +36,93 @@ public class GhostTower implements Comparable<GhostTower>{
     }
 
     static MessagePolicy onPlayerMessage(Communicator communicator, String message, String title){
+
         if (!message.startsWith("ghost") && !message.startsWith("help")) {
             return MessagePolicy.PASS;
         }
-        ConfigureOptions options = ConfigureOptions.getInstance();
-        if (communicator.getPlayer().getTarget() == null) {
+        @Nullable Creature target = communicator.getPlayer().getTarget();
+        if (target == null) {
             communicator.getPlayer().getCommunicator().sendNormalServerMessage("Ghosts only attack your target.");
-            return MessagePolicy.DISCARD;
+            return MessagePolicy.PASS;
         }
+        Player player = communicator.getPlayer();
+        if (player == null) {
+            communicator.getPlayer().getCommunicator().sendNormalServerMessage(
+                    "Broken code occurred, sorry.");
+            GhostTowerGuardMod.logger.warning(String.format(
+                    "%s, %s, %s  onPlayerMessage error where communicator.player is null.", communicator.toString(),
+                    message, title));
+            return MessagePolicy.PASS;
+        }
+        //  NO attacking creatures of same kingdom.
+        if (target.getKingdomId() == player.getKingdomId()){
+            communicator.getPlayer().getCommunicator().sendNormalServerMessage(
+                    "Ghosts wont attack a creature in your kingdom.");
+            return MessagePolicy.PASS;
+        }
+        // No attacking hitched creatures.
+        if (target.isHitched()){
+            communicator.getPlayer().getCommunicator().sendNormalServerMessage(
+                    "Ghosts wont attack a hitched creature.");
+            return MessagePolicy.PASS;
+        }
+        // No attacking creatures cared-for by players of same kingdom.
+        if (target.isCaredFor()) {
+            @Nullable Player playerCareTaker = Players.getInstance().getPlayerOrNull(target.getCareTakerId());
+            if (playerCareTaker == null) {
+                communicator.getPlayer().getCommunicator().sendNormalServerMessage(
+                        "Broken code occurred, sorry. This cared for creature doesn't have an owner.");
+                GhostTowerGuardMod.logger.warning(String.format(" %s - %d  cared for creature without a player owner.",
+                        target.getName(), target.getWurmId()));
+                return MessagePolicy.PASS;
+            } else if (playerCareTaker.getKingdomId() == player.getKingdomId()) {
+                communicator.getPlayer().getCommunicator().sendNormalServerMessage(
+                        "Ghosts won't attack a creature cared-for by a player in your kingdom.");
+                return MessagePolicy.PASS;
+            }
+        }
+        // NO attacking creatures branded to villages of same kingdom.
+        @Nullable Village targetVillage = target.getBrandVillage();
+        if (targetVillage != null && targetVillage.kingdom == player.getKingdomId()) {
+            communicator.getPlayer().getCommunicator().sendNormalServerMessage(
+                    "Ghosts won't attack a creature branded to a village in your kingdom.");
+            return MessagePolicy.PASS;
+        }
+        // No attacking creatures tamed/dominated/charmed by players of same kingdom.
+        @Nullable Creature dominator =  target.getDominator();
+        if (dominator != null && dominator.getKingdomId() == player.getKingdomId()) {
+            communicator.getPlayer().getCommunicator().sendNormalServerMessage(
+                    "Ghosts won't attack a creature controlled by a player in your kingdom.");
+            return MessagePolicy.PASS;
+        }
+        // NO attacking creatures that aren't threats.
+         if (Arrays.stream(player.getLatestAttackers())
+                .noneMatch(longId -> longId == target.getWurmId())) {
+             communicator.getPlayer().getCommunicator().sendNormalServerMessage(
+                     "Ghosts won't attack a creature that isn't currently or hasn't recently threatened you.");
+             return MessagePolicy.PASS;
+         }
+         // No village permission to attack on deed.
+        @Nullable Village occupiedVillage = Villages.getVillage(target.getTileX(), target.getTileY(), target.isOnSurface());
+        if (occupiedVillage != null && (!occupiedVillage.isActionAllowed((short)326, player) ||
+                !occupiedVillage.isActionAllowed((short)716, player))) {
+            communicator.getPlayer().getCommunicator().sendNormalServerMessage(
+                    String.format("Ghosts refuse to help you because village %s has denied you attacking permission",
+                            occupiedVillage.getName()));
+        }
+
+        ConfigureOptions options = ConfigureOptions.getInstance();
         GhostTower[] ghostTowers = GhostTower.getNearGhostTowers(communicator.getPlayer().getWurmId());
         if (ghostTowers.length < 1) {
             communicator.getPlayer().getCommunicator().sendNormalServerMessage(
                     String.format("The %s isn't within %d tiles of a Ghost Tower.",
                             communicator.getPlayer().getTarget().getName(), options.getHelpRespondRange())
             );
-            return MessagePolicy.DISCARD;
+            return MessagePolicy.PASS;
         }
         GhostTower ghostTower = ghostTowers[0];
 
-        // spawn ghost on top of mob
-        Creature target = communicator.getPlayer().getTarget();
-
+        // Spawn ghost on top of mob
         try {
             Creature creature = Creature.doNew(IdFactory.getIdFor(options.getTowerGhostIdName(), IdType.CREATURETEMPLATE)
                     , target.getPosX(), target.getPosY(), TowerGuardAI.faceTarget(target, ghostTower), target.getLayer(),
@@ -65,18 +133,20 @@ public class GhostTower implements Comparable<GhostTower>{
             creature.attackTarget();
         }catch (Exception e) {
             GhostTowerGuardMod.logger.warning(e.getMessage());
-            return MessagePolicy.DISCARD;
+            return MessagePolicy.PASS;
         }
 
-        return MessagePolicy.DISCARD;
+        return MessagePolicy.PASS;
     }
 
     static void initialize() {
+        ConfigureOptions options = ConfigureOptions.getInstance();
             Item[] ghostTowers = Arrays.stream(Items.getAllItems())
-                .filter(item -> item.getTemplateId() == ItemTemplateImporter.getItemTemplateBuilderNames().get("jdbSquareTower")
-                        || item.getTemplateId() == ItemTemplateImporter.getItemTemplateBuilderNames().get("jdbBlackTower") ||
-                        item.getTemplateId() == ItemTemplateImporter.getItemTemplateBuilderNames().get("jdbRoundTower") ||
-                        item.getTemplateId() == ItemTemplateImporter.getItemTemplateBuilderNames().get("jdbFortTower"))
+                .filter(item ->
+                        item.getTemplateId() == getItemTemplateBuilderNames().get(options.getSquareTowerIdName()) ||
+                        item.getTemplateId() == getItemTemplateBuilderNames().get(options.getBlackTowerIdName()) ||
+                        item.getTemplateId() == getItemTemplateBuilderNames().get(options.getRoundTowerIdName()) ||
+                        item.getTemplateId() == getItemTemplateBuilderNames().get(options.getFortTowerIdName()))
                 .toArray(Item[]::new);
             Arrays.stream(ghostTowers)
                     .forEach(GhostTower::new);
@@ -130,45 +200,6 @@ public class GhostTower implements Comparable<GhostTower>{
                 .collect(Collectors.toSet());
         if (ghostTowers1.size() > 0) {
             ghostTowers1.forEach(ghostTower1 -> ghostTowers.remove(ghostTower1));
-        }
-    }
-
-    static public void injectAddTowerCode() {
-        try {
-            ClassPool classPool = HookManager.getInstance().getClassPool();
-            CtClass ctAdvancedCreationEntry = classPool.get("com.wurmonline.server.items.AdvancedCreationEntry");
-            ctAdvancedCreationEntry.getClassFile().compact();
-            String name = "cont";
-            String descriptor = Descriptor.ofMethod(classPool.get("com.wurmonline.server.items.Item"), new CtClass[]{
-                    classPool.get("com.wurmonline.server.creatures.Creature"),
-                    classPool.get("com.wurmonline.server.items.Item"),
-                    CtPrimitiveType.longType, CtPrimitiveType.floatType
-            });
-            CtMethod ctCont = ctAdvancedCreationEntry.getMethod(name, descriptor);
-
-            ByteCodeWild find = new ByteCodeWild(ctAdvancedCreationEntry.getClassFile().getConstPool(),
-                    ctCont.getMethodInfo().getCodeAttribute());
-            find.addIload("obc", "I");
-            find.addFload("endQl", "F");
-            find.addIload("mat", "B");
-            find.addIload("rarity", "B");
-            find.addAload("performer", "Lcom/wurmonline/server/creatures/Creature;");
-            find.addInvokevirtual("com/wurmonline/server/creatures/Creature", "getName",
-            "()Ljava/lang/String;");
-            find.addInvokestatic("com/wurmonline/server/items/ItemFactory", "createItem",
-                    "(IFBBLjava/lang/String;)Lcom/wurmonline/server/items/Item;");
-            find.addAstore("newItem", "Lcom/wurmonline/server/items/Item;");
-            find.trimFoundBytecode();
-            int insertLine = find.getTableLineNumberAfter();
-
-            String source = "" +
-                    "if (com.joedobo27.gtgm.GhostTower.isGhostTowerTemplateType(newItem.getTemplateId())) {" +
-                    "                        com.joedobo27.gtgm.GhostTower.addGhostTower(newItem.getWurmId());" +
-                    "                    }";
-            ctCont.insertAt(insertLine, source);
-
-        }catch (NotFoundException | CannotCompileException | RuntimeException e) {
-            GhostTowerGuardMod.logger.warning(e.getMessage());
         }
     }
 
